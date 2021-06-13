@@ -1,0 +1,31 @@
+site_name: Apache Mesos Tutorial
+repo_url: https://github.com/maricaantonacci/mesos-tutorial
+site_author: Marica Antonacci - marica.antonacci@ba.infn.it
+theme:
+  name: material
+  palette:
+    primary: teal
+    accent: green
+  logo: assets/logo_infn.png
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - toc.integrate
+markdown_extensions:
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences 
+  - pymdownx.snippets
+  - pymdownx.tabbed
+  - admonition
+  - pymdownx.details
+  - attr_list
+   
+nav:
+  - Apache Mesos:
+    - Intro: 'intro.md'
+    - Deploy long running services on Marathon: 'marathon.md'
+ 
+copyright: Copyright &copy; 2021 INFN
