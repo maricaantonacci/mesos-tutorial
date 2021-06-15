@@ -24,8 +24,8 @@ markdown_extensions:
   - attr_list
    
 nav:
-  - Apache Mesos:
-    - Intro: 'intro.md'
-    - Deploy long running services on Marathon: 'marathon.md'
+  - Introduction: 'intro.md'
+  - Deploy long running services on Marathon: 'marathon.md'
+  - Execute scheduled jobs on Chronos: 'chronos.md'
  
 copyright: Copyright &copy; 2021 INFN

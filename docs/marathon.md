@@ -51,7 +51,7 @@ Finally you can destroy your application:
 ![](images/marathon_9.png)
 
 
-### Scaling and load-balancing
+## Scaling and load-balancing
 
 !!! note inline end "Reference"
     Take a look at the official docs: [https://mesosphere.github.io/marathon/docs/service-discovery-load-balancing.html](https://mesosphere.github.io/marathon/docs/service-discovery-load-balancing.html)
@@ -100,11 +100,14 @@ The following table reports the main API endpoints:
 
 | API Endpoint     | Description                          |
 | :---------- | :----------------------------------- |
+| /v2/deployments         | Query for all running deployments on a Marathon instance ('GET') |
+| /v2/deployments/<dep-id>| Query for information about a specific deployment (`GET`) |
 | /v2/apps                | Query for all applications on a Marathon instance (`GET`) or create new applications (`POST`)  |
 | /v2/apps/<app-id>       | Query for information about a specific app (`GET`), update the configuration of an app (`PUT`), or delete an app (`DELETE`) |
 | /v2/groups              | Query for all application groups on a Marathon instance (`GET`) or create a new application group (`POST`) |
 | /v2/groups/<group-id>   | Query for information about a specific application group (`GET`), update the configuration of an application group (`PUT`), or delete an application group (`DELETE`)|
 
+We will be using these endpoints in the following sections.
 
 ## Application groups
 
@@ -238,6 +241,159 @@ Since the database `test` was stored in the old container, we lose our data:
 
 ![](images/marathon_group_8.png) 
 
-### Providing persistent local storage
+## Using local storage
 
+Modify the json definition of the `db` application to request a volume:
 
+```bash linenums="1" hl_lines="19-25"
+{
+  "id": "/dbaas",
+  "apps": [
+    {
+      "id": "/dbaas/db",
+      "container": {
+        "type": "DOCKER",
+        "docker": {
+          "image": "mariadb:10.3",
+          "network": "BRIDGE",
+          "portMappings": [
+            {
+              "containerPort": 3306,
+              "servicePort": 10006,
+              "protocol": "tcp"
+            }
+          ]
+        },
+        "volumes": [
+          {
+            "containerPath": "/var/lib/mysql",
+            "mode": "RW",
+            "hostPath": "/tmp/mysql"
+          }
+        ]
+      },
+      "env": {
+        "MYSQL_ROOT_PASSWORD": "s3cret",
+        "MYSQL_USER": "phpma",
+        "MYSQL_PASSWORD": "s3cret"
+      },
+      "labels": {
+        "HAPROXY_GROUP": "external"
+      },
+      "instances": 1,
+      "cpus": 0.5,
+      "mem": 512
+    },
+    {
+      "id": "/dbaas/phpmyadmin",
+      "container": {
+        "type": "DOCKER",
+        "docker": {
+          "image": "phpmyadmin/phpmyadmin",
+          "network": "BRIDGE",
+          "portMappings": [
+            {
+              "containerPort": 80,
+              "servicePort": 10008,
+              "protocol": "tcp"
+            }
+          ]
+        }
+      },
+      "dependencies": [
+        "/dbaas/db"
+      ],
+      "env": {
+        "PMA_HOST": "192.168.28.151",
+        "PMA_PORT": "10006"
+      },
+      "labels": {
+        "HAPROXY_GROUP": "external"
+      },
+      "instances": 1,
+      "cpus": 0.1,
+      "mem": 256
+    }
+  ]
+}
+```
+Lines `19-25` define a bind-mount volume:
+
+```bash
+docker inspect $(docker ps -q --filter ancestor=mariadb:10.3)
+```
+
+```bash
+...
+            "Binds": [
+                "/tmp/mysql:/var/lib/mysql:rw",
+                "/tmp/mesos/slaves/692a979a-a998-4dd4-b059-8da9bfdf706d-S0/frameworks/692a979a-a998-4dd4-b059-8da9bfdf706d-0001/executors/dbaas_db.cb02ea99-cc5e-11eb-b551-0242ac140004/runs/34b09a76-9558-4429-bf56-61aeb8d0713a:/mnt/mesos/sandbox"
+            ],
+...
+```
+
+Update your deployment with a `PUT` request:
+
+```bash
+curl -H 'Content-Type: application/json' -X PUT http://localhost:8080/v2/groups -d@dbaas.json
+```
+
+Now repeat the steps describe above: create a database and then restart the `db` application (you can use the Marathon web ui).
+
+The database will survive if the db container is re-created.
+
+**Note that this is not sufficient to ensure data persistence for your applications. In a multi-node cluster, if the node where your container is running fails, it will be re-deployed on another node and it will not find the data stored previously.**
+
+In order to make your apps more fault-tolerant, you can use an external storage service, such as Ceph or Amazon EBS, to create a persistent volume that follows your application instance.
+
+This topic is beyond the scope of this basic tutorial. See the [docs](https://mesosphere.github.io/marathon/docs/external-volumes.html) for more details.
+
+## Health checks
+
+Using the web UI click on the `Health Checks` tab to setup your checks:
+
+![](images/health_checks_1.png)  
+
+Using the REST APIs add the `healthChecks` definition in the application json as in the following example:
+
+```bash
+{
+  "id": "nginx",
+  "cpus": 0.25,
+  "mem": 128,
+  "disk": 0,
+  "instances": 1,
+  "container": {
+    "docker": {
+      "image": "nginx"
+    },
+    "type": "DOCKER",
+    "portMappings": [
+      {
+        "containerPort": 80,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "networks": [
+    {
+      "mode": "container/bridge"
+    }
+  ],
+  "healthChecks": [
+    {
+      "protocol": "HTTP",
+      "path": "/",
+      "portIndex": 0,
+      "gracePeriodSeconds": 300,
+      "intervalSeconds": 60,
+      "timeoutSeconds": 20,
+      "maxConsecutiveFailures": 3
+    }
+  ]
+}
+```
+
+If the checks are passed, the application status will be `healthy` and you will get a green bar near your instance:
+
+![](images/health_checks_2.png)
