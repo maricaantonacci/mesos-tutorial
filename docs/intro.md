@@ -1,5 +1,9 @@
 ## Description of the mini-cluster
 
+A typical production installation of a Mesos cluster is shown in the following diagram:
+
+![](images/mesos_cluster.png) 
+
 For this tutorial we will be using an *all-in-one* installation of Mesos/Marathon/Chronos.
 
 This is the docker compose file used to setup the mini-cluster: 
