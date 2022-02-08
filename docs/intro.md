@@ -23,11 +23,11 @@ services:
       - ./var/log/zookeeper:/var/log/zookeeper
       - ./var/lib/zookeeper:/var/lib/zookeeper
   mesosmaster:
-    image: indigodatacloud/mesos-master:1.9.0
+    image: marica/mesos-master:1.11.0
     ports:
       - 5050:5050
     environment:
-      - MESOS_HOSTNAME=${DOCKER_HOST_IP}
+      - MESOS_HOSTNAME=192.168.28.196
       - MESOS_CLUSTER=Mesos
       - MESOS_ZK=zk://zookeeper:2181/mesos
       - MESOS_LOG_DIR=/var/log/mesos
@@ -40,7 +40,7 @@ services:
     depends_on:
       - zookeeper
   mesosslave:
-    image: indigodatacloud/mesos-slave:1.9.0
+    image: marica/mesos-agent:1.11.0
     ports:
       - 5051:5051
     pid: host
@@ -51,11 +51,11 @@ services:
       MESOS_PORT: 5051
       MESOS_RESOURCES: ports(*):[11000-11999]
       MESOS_WORK_DIR: /tmp/mesos
-      MESOS_HOSTNAME: ${DOCKER_HOST_IP}
+      MESOS_HOSTNAME: 192.168.28.196
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./tmp/mesos:/tmp/mesos
+      - /tmp/mesos:/tmp/mesos
       - ./var/log/mesos:/var/log/mesos
     depends_on:
       - zookeeper
@@ -65,7 +65,7 @@ services:
     ports:
       - 4400:4400
     environment:
-      - CHRONOS_HOSTNAME=${DOCKER_HOST_IP}
+      - CHRONOS_HOSTNAME=192.168.28.196
       - CHRONOS_HTTP_PORT=4400
       - CHRONOS_MASTER=zk://zookeeper:2181/mesos
       - CHRONOS_ZK_HOSTS=zk://zookeeper:2181
@@ -76,11 +76,11 @@ services:
       - mesosmaster
 
   marathon:
-    image: indigodatacloud/marathon:1.5.6
+    image: marica/marathon:1.8.244
     ports:
       - 8080:8080
     environment:
-      - MARATHON_HOSTNAME=${DOCKER_HOST_IP}
+      - MARATHON_HOSTNAME=192.168.28.196
       - MARATHON_HTTP_PORT=8080
       - MARATHON_MASTER=zk://zookeeper:2181/mesos
       - MARATHON_ZK=zk://zookeeper:2181/marathon
@@ -88,6 +88,16 @@ services:
     depends_on:
       - zookeeper
       - mesosmaster
+
+  marathon_lb:
+    image: mesosphere/marathon-lb:v1.14.1
+    command: sse --marathon http://marathon:8080 --group external
+    ports:
+      - "10000-10100:10000-10100"
+    environment:
+      - PORTS=9090
+    depends_on:
+      - marathon
 ```
 
 Start the cluster:
